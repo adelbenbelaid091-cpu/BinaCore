@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Building2, ChevronDown, ChevronRight, Layers, CheckCircle2, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Building2, ChevronDown, ChevronRight, Layers, CheckCircle2, Trash2, Lock, Unlock, LockIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ interface Project {
   projectCode: string
   name: string
   description: string
+  password?: string
   blocks: Block[]
 }
 
@@ -89,10 +90,14 @@ export function Projects() {
   const [showAddBlockDialog, setShowAddBlockDialog] = useState(false)
   const [showAddFloorDialog, setShowAddFloorDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [projectToUnlock, setProjectToUnlock] = useState<Project | null>(null)
+  const [passwordInput, setPasswordInput] = useState('')
   const [deleteType, setDeleteType] = useState<'project' | 'block' | 'floor' | null>(null)
   const [itemToDelete, setItemToDelete] = useState<{ projectId: string; blockId?: string; floorId?: string } | null>(null)
   const [selectedProjectForBlock, setSelectedProjectForBlock] = useState<string | null>(null)
   const [selectedBlockForFloor, setSelectedBlockForFloor] = useState<string | null>(null)
+  const [unlockedProjects, setUnlockedProjects] = useState<Set<string>>(new Set())
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set())
 
@@ -100,6 +105,7 @@ export function Projects() {
     projectCode: '',
     name: '',
     description: '',
+    password: '',
   })
 
   const [blockFormData, setBlockFormData] = useState({
@@ -123,12 +129,13 @@ export function Projects() {
       projectCode: projectFormData.projectCode,
       name: projectFormData.name,
       description: projectFormData.description,
+      password: projectFormData.password || undefined,
       blocks: [],
     }
 
     setProjects([newProject, ...projects])
     setShowCreateProjectDialog(false)
-    setProjectFormData({ projectCode: '', name: '', description: '' })
+    setProjectFormData({ projectCode: '', name: '', description: '', password: '' })
     toast({
       title: t('success'),
       description: 'Project created successfully',
@@ -295,6 +302,66 @@ export function Projects() {
     return Math.round((floor.groOeuvreProgress + floor.cetProgress + floor.cesProgress) / 3)
   }
 
+  // Load unlocked projects from session storage on mount
+  useEffect(() => {
+    const saved = sessionStorage.getItem('unlockedProjects')
+    if (saved) {
+      setUnlockedProjects(new Set(JSON.parse(saved)))
+    }
+  }, [])
+
+  // Save unlocked projects to session storage
+  useEffect(() => {
+    sessionStorage.setItem('unlockedProjects', JSON.stringify(Array.from(unlockedProjects)))
+  }, [unlockedProjects])
+
+  const isProjectUnlocked = (projectId: string) => {
+    return !projects.find(p => p.id === projectId)?.password || unlockedProjects.has(projectId)
+  }
+
+  const handleUnlockProject = () => {
+    if (!projectToUnlock) return
+
+    if (passwordInput === projectToUnlock.password) {
+      setUnlockedProjects(new Set([...unlockedProjects, projectToUnlock.id]))
+      setShowPasswordDialog(false)
+      setPasswordInput('')
+      setProjectToUnlock(null)
+      toast({
+        title: t('success'),
+        description: t('projectUnlockedSuccess'),
+      })
+    } else {
+      toast({
+        title: t('error'),
+        description: t('incorrectPassword'),
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const requestUnlockProject = (project: Project) => {
+    setProjectToUnlock(project)
+    setShowPasswordDialog(true)
+    setPasswordInput('')
+  }
+
+  const toggleProjectExpanded = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (project?.password && !unlockedProjects.has(projectId)) {
+      requestUnlockProject(project)
+      return
+    }
+
+    const newExpanded = new Set(expandedProjects)
+    if (newExpanded.has(projectId)) {
+      newExpanded.delete(projectId)
+    } else {
+      newExpanded.add(projectId)
+    }
+    setExpandedProjects(newExpanded)
+  }
+
   return (
     <div className="space-y-6 pb-24">
       <div className="flex items-center justify-between">
@@ -318,6 +385,12 @@ export function Projects() {
                     <Building2 className="w-5 h-5 text-primary" />
                     <CardTitle className="text-lg">{project.name}</CardTitle>
                     <Badge variant="outline">{project.projectCode}</Badge>
+                    {project.password && (
+                      <Badge variant="secondary" className="gap-1">
+                        <LockIcon className="w-3 h-3" />
+                        {unlockedProjects.has(project.id) ? t('projectUnlocked') : t('projectProtected')}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground">{project.description}</p>
                   <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
@@ -338,13 +411,25 @@ export function Projects() {
                   >
                     <Trash2 className="w-5 h-5" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => toggleProjectExpanded(project.id)}>
-                    {expandedProjects.has(project.id) ? (
-                      <ChevronDown className="w-5 h-5" />
-                    ) : (
-                      <ChevronRight className="w-5 h-5" />
-                    )}
-                  </Button>
+                  {project.password && !unlockedProjects.has(project.id) ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleProjectExpanded(project.id)}
+                      title="Unlock project"
+                      className="text-primary hover:text-primary"
+                    >
+                      <Lock className="w-5 h-5" />
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="icon" onClick={() => toggleProjectExpanded(project.id)}>
+                      {expandedProjects.has(project.id) ? (
+                        <ChevronDown className="w-5 h-5" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5" />
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -579,6 +664,15 @@ export function Projects() {
                 rows={3}
               />
             </div>
+            <div className="space-y-2">
+              <Label>{t('passwordOptional')}</Label>
+              <Input
+                type="password"
+                placeholder="Leave empty for no password"
+                value={projectFormData.password}
+                onChange={(e) => setProjectFormData({ ...projectFormData, password: e.target.value })}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateProjectDialog(false)}>
@@ -745,6 +839,47 @@ export function Projects() {
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Verification Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('enterPassword')}</DialogTitle>
+            <DialogDescription>
+              This project is protected. Please enter the password to access its details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>{t('projectName')}</Label>
+              <Input value={projectToUnlock?.name} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('projectPassword')} *</Label>
+              <Input
+                type="password"
+                placeholder="Enter project password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleUnlockProject()
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+              {t('cancel')}
+            </Button>
+            <Button onClick={handleUnlockProject}>
+              {t('unlockProject')}
             </Button>
           </DialogFooter>
         </DialogContent>
