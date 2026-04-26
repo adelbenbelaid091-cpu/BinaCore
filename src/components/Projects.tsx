@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Building2, ChevronDown, ChevronRight, Layers, CheckCircle2, Trash2, Lock, Unlock, LockIcon } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Building2, ChevronDown, ChevronRight, Layers, CheckCircle2, Trash2, Lock, LockIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { useApp } from '@/contexts/AppContext'
+import { useProjectAuth } from '@/contexts/ProjectAuthContext'
 import { toast } from '@/hooks/use-toast'
 
 interface Project {
@@ -44,12 +45,14 @@ interface Floor {
 
 export function Projects() {
   const { t } = useApp()
+  const { isProjectUnlocked, unlockProject } = useProjectAuth()
   const [projects, setProjects] = useState<Project[]>([
     {
       id: '1',
       projectCode: 'PRJ-2024-001',
       name: 'Residential Tower A',
       description: '12-story residential building with parking',
+      password: '1234',
       blocks: [
         {
           id: 'b1',
@@ -97,7 +100,6 @@ export function Projects() {
   const [itemToDelete, setItemToDelete] = useState<{ projectId: string; blockId?: string; floorId?: string } | null>(null)
   const [selectedProjectForBlock, setSelectedProjectForBlock] = useState<string | null>(null)
   const [selectedBlockForFloor, setSelectedBlockForFloor] = useState<string | null>(null)
-  const [unlockedProjects, setUnlockedProjects] = useState<Set<string>>(new Set())
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set())
 
@@ -222,16 +224,6 @@ export function Projects() {
     })
   }
 
-  const toggleProjectExpanded = (projectId: string) => {
-    const newExpanded = new Set(expandedProjects)
-    if (newExpanded.has(projectId)) {
-      newExpanded.delete(projectId)
-    } else {
-      newExpanded.add(projectId)
-    }
-    setExpandedProjects(newExpanded)
-  }
-
   const toggleBlockExpanded = (blockId: string) => {
     const newExpanded = new Set(expandedBlocks)
     if (newExpanded.has(blockId)) {
@@ -302,28 +294,10 @@ export function Projects() {
     return Math.round((floor.groOeuvreProgress + floor.cetProgress + floor.cesProgress) / 3)
   }
 
-  // Load unlocked projects from session storage on mount
-  useEffect(() => {
-    const saved = sessionStorage.getItem('unlockedProjects')
-    if (saved) {
-      setUnlockedProjects(new Set(JSON.parse(saved)))
-    }
-  }, [])
-
-  // Save unlocked projects to session storage
-  useEffect(() => {
-    sessionStorage.setItem('unlockedProjects', JSON.stringify(Array.from(unlockedProjects)))
-  }, [unlockedProjects])
-
-  const isProjectUnlocked = (projectId: string) => {
-    return !projects.find(p => p.id === projectId)?.password || unlockedProjects.has(projectId)
-  }
-
   const handleUnlockProject = () => {
     if (!projectToUnlock) return
 
-    if (passwordInput === projectToUnlock.password) {
-      setUnlockedProjects(new Set([...unlockedProjects, projectToUnlock.id]))
+    if (unlockProject(projectToUnlock.id, projectToUnlock.password, passwordInput)) {
       setShowPasswordDialog(false)
       setPasswordInput('')
       setProjectToUnlock(null)
@@ -348,7 +322,7 @@ export function Projects() {
 
   const toggleProjectExpanded = (projectId: string) => {
     const project = projects.find(p => p.id === projectId)
-    if (project?.password && !unlockedProjects.has(projectId)) {
+    if (project?.password && !isProjectUnlocked(projectId, project.password)) {
       requestUnlockProject(project)
       return
     }
@@ -388,7 +362,7 @@ export function Projects() {
                     {project.password && (
                       <Badge variant="secondary" className="gap-1">
                         <LockIcon className="w-3 h-3" />
-                        {unlockedProjects.has(project.id) ? t('projectUnlocked') : t('projectProtected')}
+                        {isProjectUnlocked(project.id, project.password) ? t('projectUnlocked') : t('projectProtected')}
                       </Badge>
                     )}
                   </div>
@@ -411,7 +385,7 @@ export function Projects() {
                   >
                     <Trash2 className="w-5 h-5" />
                   </Button>
-                  {project.password && !unlockedProjects.has(project.id) ? (
+                  {project.password && !isProjectUnlocked(project.id, project.password) ? (
                     <Button
                       variant="ghost"
                       size="icon"

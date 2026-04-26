@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, AlertTriangle, CheckCircle2, Clock, Edit, Trash2, Filter } from 'lucide-react'
+import { Plus, AlertTriangle, CheckCircle2, Clock, Edit, Trash2, Filter, Lock, LockIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApp } from '@/contexts/AppContext'
+import { useProjectAuth } from '@/contexts/ProjectAuthContext'
 import { toast } from '@/hooks/use-toast'
 
 interface Issue {
@@ -27,8 +28,23 @@ interface Issue {
   floor?: string
 }
 
+interface ProjectWithPassword {
+  id: string
+  name: string
+  password?: string
+}
+
 export function Issues() {
   const { t } = useApp()
+  const { isProjectUnlocked, unlockProject } = useProjectAuth()
+
+  // Projects with their passwords (should match projects in Projects.tsx)
+  const projects: ProjectWithPassword[] = [
+    { id: '1', name: 'Residential Tower A', password: '1234' },
+    { id: '2', name: 'Commercial Complex B' },
+    { id: '3', name: 'Villa Project C' },
+  ]
+
   const [issues, setIssues] = useState<Issue[]>([
     {
       id: '1',
@@ -73,6 +89,9 @@ export function Issues() {
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null)
   const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all')
   const [filterSeverity, setFilterSeverity] = useState<'all' | 'low' | 'medium' | 'high' | 'critical'>('all')
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [projectToUnlock, setProjectToUnlock] = useState<ProjectWithPassword | null>(null)
+  const [passwordInput, setPasswordInput] = useState('')
 
   const [formData, setFormData] = useState({
     projectId: '',
@@ -82,12 +101,6 @@ export function Issues() {
     severity: 'medium' as 'low' | 'medium' | 'high' | 'critical',
     floor: '',
   })
-
-  const projects = [
-    { id: '1', name: 'Residential Tower A' },
-    { id: '2', name: 'Commercial Complex B' },
-    { id: '3', name: 'Villa Project C' },
-  ]
 
   const handleCreateIssue = () => {
     const project = projects.find(p => p.id === formData.projectId)
@@ -203,6 +216,40 @@ export function Issues() {
     }
   }
 
+  const isIssueUnlocked = (issue: Issue) => {
+    const project = projects.find(p => p.id === issue.projectId)
+    return isProjectUnlocked(issue.projectId, project?.password)
+  }
+
+  const handleUnlockProject = () => {
+    if (!projectToUnlock) return
+
+    if (unlockProject(projectToUnlock.id, projectToUnlock.password, passwordInput)) {
+      setShowPasswordDialog(false)
+      setPasswordInput('')
+      setProjectToUnlock(null)
+      toast({
+        title: t('success'),
+        description: t('projectUnlockedSuccess'),
+      })
+    } else {
+      toast({
+        title: t('error'),
+        description: t('incorrectPassword'),
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const requestUnlockProject = (issue: Issue) => {
+    const project = projects.find(p => p.id === issue.projectId)
+    if (project) {
+      setProjectToUnlock(project)
+      setShowPasswordDialog(true)
+      setPasswordInput('')
+    }
+  }
+
   const stats = {
     total: issues.length,
     open: issues.filter(i => i.status === 'open').length,
@@ -313,60 +360,103 @@ export function Issues() {
             </CardContent>
           </Card>
         ) : (
-          filteredIssues.map((issue) => (
-            <Card key={issue.id} className={`shadow-sm ${issue.status === 'resolved' ? 'opacity-60' : ''}`}>
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-lg ${issue.severity === 'critical' ? 'bg-red-100 dark:bg-red-900/30' : issue.severity === 'high' ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-muted'}`}>
-                    {getStatusIcon(issue.status)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <h3 className="font-semibold text-foreground">{issue.title}</h3>
-                          {getStatusBadge(issue.status)}
-                          <Badge className={getSeverityColor(issue.severity)}>{t(issue.severity)}</Badge>
-                          {getTypeBadge(issue.type)}
+          filteredIssues.map((issue) => {
+            const unlocked = isIssueUnlocked(issue)
+            const project = projects.find(p => p.id === issue.projectId)
+            const isProtected = project?.password
+
+            return (
+              <Card key={issue.id} className={`shadow-sm ${issue.status === 'resolved' ? 'opacity-60' : ''} ${!unlocked && isProtected ? 'opacity-50' : ''}`}>
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg ${!unlocked && isProtected ? 'bg-muted/50' : issue.severity === 'critical' ? 'bg-red-100 dark:bg-red-900/30' : issue.severity === 'high' ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-muted'}`}>
+                      {!unlocked && isProtected ? (
+                        <LockIcon className="w-6 h-6 text-muted-foreground" />
+                      ) : (
+                        getStatusIcon(issue.status)
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {unlocked ? (
+                        <>
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap mb-2">
+                                <h3 className="font-semibold text-foreground">{issue.title}</h3>
+                                {getStatusBadge(issue.status)}
+                                <Badge className={getSeverityColor(issue.severity)}>{t(issue.severity)}</Badge>
+                                {getTypeBadge(issue.type)}
+                                {isProtected && (
+                                  <Badge variant="secondary" className="gap-1">
+                                    <LockIcon className="w-3 h-3" />
+                                    {t('projectProtected')}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">{issue.description}</p>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <span>{issue.projectName}</span>
+                                {issue.floor && <span>• {issue.floor}</span>}
+                                <span>• {new Date(issue.createdAt).toLocaleString()}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              {issue.status !== 'resolved' && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleUpdateStatus(issue.id, 'resolved')}
+                                  >
+                                    <CheckCircle2 className="w-4 h-4 mr-1" />
+                                    Resolve
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleUpdateStatus(issue.id, 'in_progress')}
+                                  >
+                                    <Clock className="w-4 h-4 mr-1" />
+                                    In Progress
+                                  </Button>
+                                </>
+                              )}
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteIssue(issue.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold text-foreground">{issue.title}</h3>
+                            <Badge className={getSeverityColor(issue.severity)}>{t(issue.severity)}</Badge>
+                            {isProtected && (
+                              <Badge variant="secondary" className="gap-1">
+                                <LockIcon className="w-3 h-3" />
+                                {t('projectProtected')}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">This issue is protected. Enter the project password to view details.</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => requestUnlockProject(issue)}
+                          >
+                            <Lock className="w-4 h-4" />
+                            Unlock to View
+                          </Button>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">{issue.description}</p>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span>{issue.projectName}</span>
-                          {issue.floor && <span>• {issue.floor}</span>}
-                          <span>• {new Date(issue.createdAt).toLocaleString()}</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {issue.status !== 'resolved' && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleUpdateStatus(issue.id, 'resolved')}
-                            >
-                              <CheckCircle2 className="w-4 h-4 mr-1" />
-                              Resolve
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleUpdateStatus(issue.id, 'in_progress')}
-                            >
-                              <Clock className="w-4 h-4 mr-1" />
-                              In Progress
-                            </Button>
-                          </>
-                        )}
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteIssue(issue.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            )
+          })
         )}
       </div>
 
@@ -461,6 +551,47 @@ export function Issues() {
               {t('cancel')}
             </Button>
             <Button onClick={handleCreateIssue}>{t('save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Verification Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('enterPassword')}</DialogTitle>
+            <DialogDescription>
+              This project is protected. Please enter the password to access its issues.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>{t('projectName')}</Label>
+              <Input value={projectToUnlock?.name} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('projectPassword')} *</Label>
+              <Input
+                type="password"
+                placeholder="Enter project password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleUnlockProject()
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+              {t('cancel')}
+            </Button>
+            <Button onClick={handleUnlockProject}>
+              {t('unlockProject')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
