@@ -17,38 +17,35 @@ export function ProjectAuthProvider({ children }: { children: ReactNode }) {
 
   // Load unlocked projects from session storage on mount
   useEffect(() => {
-    setMounted(true)
     const saved = sessionStorage.getItem('binacore-unlockedProjects')
     if (saved) {
       try {
-        setUnlockedProjects(new Set(JSON.parse(saved)))
+        const projects = JSON.parse(saved)
+        setUnlockedProjects(new Set(projects))
       } catch (error) {
         console.error('Failed to load unlocked projects:', error)
       }
     }
+    setMounted(true)
   }, [])
 
   // Save unlocked projects to session storage
   useEffect(() => {
-    if (mounted) {
+    if (mounted && unlockedProjects.size > 0) {
       sessionStorage.setItem('binacore-unlockedProjects', JSON.stringify(Array.from(unlockedProjects)))
     }
   }, [unlockedProjects, mounted])
 
   const isProjectUnlocked = (projectId: string, projectPassword?: string): boolean => {
-    // If no password is set, project is always unlocked
     if (!projectPassword) return true
-    // Otherwise, check if it's in the unlocked set
     return unlockedProjects.has(projectId)
   }
 
   const unlockProject = (projectId: string, projectPassword: string | undefined, passwordInput: string): boolean => {
-    // If no password is set, automatically unlock
     if (!projectPassword) {
       setUnlockedProjects(new Set([...unlockedProjects, projectId]))
       return true
     }
-    // Verify password
     if (passwordInput === projectPassword) {
       setUnlockedProjects(new Set([...unlockedProjects, projectId]))
       return true
@@ -60,11 +57,6 @@ export function ProjectAuthProvider({ children }: { children: ReactNode }) {
     const newUnlocked = new Set(unlockedProjects)
     newUnlocked.delete(projectId)
     setUnlockedProjects(newUnlocked)
-  }
-
-  // Don't render children until mounted to prevent hydration mismatch
-  if (!mounted) {
-    return null
   }
 
   return (
