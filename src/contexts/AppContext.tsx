@@ -16,20 +16,22 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>('en')
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [language, setLanguageState] = useState<Language>('en')
+  const [theme, setThemeState] = useState<'light' | 'dark'>('light')
   const [currentPage, setCurrentPage] = useState('dashboard')
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     // Load settings from localStorage
     const savedLanguage = localStorage.getItem('binacore-language') as Language
     const savedTheme = localStorage.getItem('binacore-theme') as 'light' | 'dark'
 
-    if (savedLanguage) setLanguage(savedLanguage)
-    if (savedTheme) setTheme(savedTheme)
+    if (savedLanguage) setLanguageState(savedLanguage)
+    if (savedTheme) setThemeState(savedTheme)
 
     // Apply theme to document
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (savedTheme === 'dark' || (!savedTheme && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
@@ -37,12 +39,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const handleSetLanguage = (lang: Language) => {
-    setLanguage(lang)
+    setLanguageState(lang)
     localStorage.setItem('binacore-language', lang)
   }
 
   const handleSetTheme = (newTheme: 'light' | 'dark') => {
-    setTheme(newTheme)
+    setThemeState(newTheme)
     localStorage.setItem('binacore-theme', newTheme)
 
     if (newTheme === 'dark') {
