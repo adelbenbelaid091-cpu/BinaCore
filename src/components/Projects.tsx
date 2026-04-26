@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Building2, ChevronDown, ChevronRight, Layers, CheckCircle2 } from 'lucide-react'
+import { Plus, Building2, ChevronDown, ChevronRight, Layers, CheckCircle2, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -88,6 +88,9 @@ export function Projects() {
   const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false)
   const [showAddBlockDialog, setShowAddBlockDialog] = useState(false)
   const [showAddFloorDialog, setShowAddFloorDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteType, setDeleteType] = useState<'project' | 'block' | 'floor' | null>(null)
+  const [itemToDelete, setItemToDelete] = useState<{ projectId: string; blockId?: string; floorId?: string } | null>(null)
   const [selectedProjectForBlock, setSelectedProjectForBlock] = useState<string | null>(null)
   const [selectedBlockForFloor, setSelectedBlockForFloor] = useState<string | null>(null)
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
@@ -232,6 +235,62 @@ export function Projects() {
     setExpandedBlocks(newExpanded)
   }
 
+  const handleDelete = () => {
+    if (!itemToDelete || !deleteType) return
+
+    if (deleteType === 'project') {
+      setProjects(projects.filter(p => p.id !== itemToDelete.projectId))
+      toast({
+        title: t('success'),
+        description: 'Project deleted successfully',
+      })
+    } else if (deleteType === 'block') {
+      setProjects(projects.map(project => {
+        if (project.id === itemToDelete.projectId) {
+          return {
+            ...project,
+            blocks: project.blocks.filter(b => b.id !== itemToDelete.blockId)
+          }
+        }
+        return project
+      }))
+      toast({
+        title: t('success'),
+        description: 'Block deleted successfully',
+      })
+    } else if (deleteType === 'floor') {
+      setProjects(projects.map(project => {
+        if (project.id === itemToDelete.projectId) {
+          const updatedBlocks = project.blocks.map(block => {
+            if (block.id === itemToDelete.blockId) {
+              return {
+                ...block,
+                floors: block.floors.filter(f => f.id !== itemToDelete.floorId)
+              }
+            }
+            return block
+          })
+          return { ...project, blocks: updatedBlocks }
+        }
+        return project
+      }))
+      toast({
+        title: t('success'),
+        description: 'Floor deleted successfully',
+      })
+    }
+
+    setShowDeleteDialog(false)
+    setDeleteType(null)
+    setItemToDelete(null)
+  }
+
+  const confirmDelete = (type: 'project' | 'block' | 'floor', projectId: string, blockId?: string, floorId?: string) => {
+    setDeleteType(type)
+    setItemToDelete({ projectId, blockId, floorId })
+    setShowDeleteDialog(true)
+  }
+
   const calculateOverallProgress = (floor: Floor) => {
     return Math.round((floor.groOeuvreProgress + floor.cetProgress + floor.cesProgress) / 3)
   }
@@ -270,6 +329,15 @@ export function Projects() {
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => confirmDelete('project', project.id)}
+                    title={t('delete')}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => toggleProjectExpanded(project.id)}>
                     {expandedProjects.has(project.id) ? (
                       <ChevronDown className="w-5 h-5" />
@@ -321,6 +389,15 @@ export function Projects() {
                             <Plus className="w-4 h-4" />
                             Add Block
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => confirmDelete('block', project.id, block.id)}
+                            title={t('delete')}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => toggleBlockExpanded(block.id)}>
                             {expandedBlocks.has(block.id) ? (
                               <ChevronDown className="w-5 h-5" />
@@ -370,6 +447,17 @@ export function Projects() {
                                         <span>{new Date(floor.concreteDate).toLocaleString()}</span>
                                       </div>
                                     )}
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => confirmDelete('floor', project.id, block.id, floor.id)}
+                                      title={t('delete')}
+                                      className="text-destructive hover:text-destructive h-8 w-8"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
                                   </div>
                                 </div>
 
@@ -632,6 +720,32 @@ export function Projects() {
               {t('cancel')}
             </Button>
             <Button onClick={handleCreateFloor}>{t('save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {deleteType === 'project' && 'Delete Project'}
+              {deleteType === 'block' && 'Delete Block'}
+              {deleteType === 'floor' && 'Delete Floor'}
+            </DialogTitle>
+            <DialogDescription>
+              {deleteType === 'project' && 'Are you sure you want to delete this project? All blocks and floors within it will also be deleted. This action cannot be undone.'}
+              {deleteType === 'block' && 'Are you sure you want to delete this block? All floors within it will also be deleted. This action cannot be undone.'}
+              {deleteType === 'floor' && 'Are you sure you want to delete this floor? This action cannot be undone.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              {t('cancel')}
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
