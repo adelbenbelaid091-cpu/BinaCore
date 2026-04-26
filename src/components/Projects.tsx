@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Building2, Edit, Trash2, ChevronDown, ChevronRight, Layers, CheckCircle2 } from 'lucide-react'
+import { Plus, Building2, ChevronDown, ChevronRight, Layers, CheckCircle2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,8 +18,6 @@ interface Project {
   projectCode: string
   name: string
   description: string
-  createdAt: string
-  updatedAt: string
   blocks: Block[]
 }
 
@@ -41,7 +39,6 @@ interface Floor {
   groOeuvreProgress: number
   cetProgress: number
   cesProgress: number
-  createdAt: string
 }
 
 export function Projects() {
@@ -52,8 +49,6 @@ export function Projects() {
       projectCode: 'PRJ-2024-001',
       name: 'Residential Tower A',
       description: '12-story residential building with parking',
-      createdAt: '2024-01-10T08:00:00',
-      updatedAt: '2024-01-10T08:00:00',
       blocks: [
         {
           id: 'b1',
@@ -71,7 +66,6 @@ export function Projects() {
               groOeuvreProgress: 100,
               cetProgress: 80,
               cesProgress: 60,
-              createdAt: '2024-01-15T08:00:00',
             },
             {
               id: 'f2',
@@ -84,7 +78,6 @@ export function Projects() {
               groOeuvreProgress: 75,
               cetProgress: 50,
               cesProgress: 40,
-              createdAt: '2024-01-15T09:00:00',
             },
           ],
         },
@@ -127,8 +120,6 @@ export function Projects() {
       projectCode: projectFormData.projectCode,
       name: projectFormData.name,
       description: projectFormData.description,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       blocks: [],
     }
 
@@ -145,13 +136,13 @@ export function Projects() {
     if (!selectedProjectForBlock) return
 
     const newBlock: Block = {
-      id: `block-${Date.now()}`,
+      id: 'block-' + Date.now(),
       projectId: selectedProjectForBlock,
       name: blockFormData.name,
       floors: [],
     }
 
-    setProjects(projects.map(project => {
+    setProjects(projects.map((project) => {
       if (project.id === selectedProjectForBlock) {
         return {
           ...project,
@@ -174,7 +165,7 @@ export function Projects() {
     if (!selectedBlockForFloor) return
 
     const newFloor: Floor = {
-      id: `floor-${Date.now()}`,
+      id: 'floor-' + Date.now(),
       blockId: selectedBlockForFloor,
       floorNumber: floorFormData.floorNumber,
       floorName: floorFormData.floorName || null,
@@ -184,23 +175,23 @@ export function Projects() {
       groOeuvreProgress: floorFormData.groOeuvreProgress,
       cetProgress: floorFormData.cetProgress,
       cesProgress: floorFormData.cesProgress,
-      createdAt: new Date().toISOString(),
     }
 
-    setProjects(projects.map(project => {
-      const project = {
-        ...project,
-        blocks: project.blocks.map(block => {
-          if (block.id === selectedBlockForFloor) {
-            return {
-              ...block,
-              floors: [...block.floors, newFloor],
-            }
+    setProjects(projects.map((project) => {
+      const updatedBlocks = project.blocks.map((block) => {
+        if (block.id === selectedBlockForFloor) {
+          return {
+            ...block,
+            floors: [...block.floors, newFloor],
           }
-          return block
-        }),
+        }
+        return block
+      })
+
+      return {
+        ...project,
+        blocks: updatedBlocks,
       }
-      return project
     }))
 
     setShowAddFloorDialog(false)
@@ -247,7 +238,6 @@ export function Projects() {
 
   return (
     <div className="space-y-6 pb-24">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">{t('projects')}</h1>
@@ -259,16 +249,12 @@ export function Projects() {
         </Button>
       </div>
 
-      {/* Projects List */}
       <div className="space-y-4">
         {projects.map((project) => (
           <Card key={project.id} className="shadow-sm">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-4">
-                <div
-                  className="flex-1 cursor-pointer"
-                  onClick={() => toggleProjectExpanded(project.id)}
-                >
+                <div className="flex-1 cursor-pointer" onClick={() => toggleProjectExpanded(project.id)}>
                   <div className="flex items-center gap-2 mb-2">
                     <Building2 className="w-5 h-5 text-primary" />
                     <CardTitle className="text-lg">{project.name}</CardTitle>
@@ -297,7 +283,6 @@ export function Projects() {
 
             {expandedProjects.has(project.id) && (
               <CardContent className="pt-0 space-y-3">
-                {/* Blocks */}
                 {project.blocks.length === 0 ? (
                   <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
                     <Layers className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
@@ -316,7 +301,6 @@ export function Projects() {
                 ) : (
                   project.blocks.map((block) => (
                     <div key={block.id} className="border border-border rounded-lg p-4 space-y-3">
-                      {/* Block Header */}
                       <div className="flex items-start justify-between">
                         <div className="flex-1 cursor-pointer" onClick={() => toggleBlockExpanded(block.id)}>
                           <div className="flex items-center gap-2">
@@ -347,7 +331,6 @@ export function Projects() {
                         </div>
                       </div>
 
-                      {/* Floors */}
                       {expandedBlocks.has(block.id) && (
                         <div className="space-y-3 pl-2">
                           {block.floors.length === 0 ? (
@@ -368,7 +351,6 @@ export function Projects() {
                           ) : (
                             block.floors.map((floor) => (
                               <div key={floor.id} className="bg-muted/50 rounded-lg p-4 space-y-3">
-                                {/* Floor Header */}
                                 <div className="flex items-start justify-between">
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-2">
@@ -389,14 +371,9 @@ export function Projects() {
                                       </div>
                                     )}
                                   </div>
-                                  <Button variant="ghost" size="icon">
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
                                 </div>
 
-                                {/* Progress Bars */}
                                 <div className="space-y-2">
-                                  {/* GRO OEUVRE */}
                                   <div className="space-y-1">
                                     <div className="flex justify-between text-xs">
                                       <span className="text-muted-foreground">{t('groOeuvre')}</span>
@@ -405,7 +382,6 @@ export function Projects() {
                                     <Progress value={floor.groOeuvreProgress} className="h-2" />
                                   </div>
 
-                                  {/* CET */}
                                   <div className="space-y-1">
                                     <div className="flex justify-between text-xs">
                                       <span className="text-muted-foreground">CET</span>
@@ -414,7 +390,6 @@ export function Projects() {
                                     <Progress value={floor.cetProgress} className="h-2" />
                                   </div>
 
-                                  {/* CES */}
                                   <div className="space-y-1">
                                     <div className="flex justify-between text-xs">
                                       <span className="text-muted-foreground">CES</span>
@@ -423,7 +398,6 @@ export function Projects() {
                                     <Progress value={floor.cesProgress} className="h-2" />
                                   </div>
 
-                                  {/* Overall Progress */}
                                   <div className="space-y-1 pt-2 border-t border-border">
                                     <div className="flex justify-between text-xs">
                                       <span className="text-muted-foreground">Overall Progress</span>
@@ -431,14 +405,10 @@ export function Projects() {
                                         {calculateOverallProgress(floor)}%
                                       </span>
                                     </div>
-                                    <Progress
-                                      value={calculateOverallProgress(floor)}
-                                      className="h-2"
-                                    />
+                                    <Progress value={calculateOverallProgress(floor)} className="h-2" />
                                   </div>
                                 </div>
 
-                                {/* Concrete Review */}
                                 {floor.concreteReview && (
                                   <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg">
                                     <span className="text-sm font-medium text-foreground">
@@ -448,7 +418,6 @@ export function Projects() {
                                   </div>
                                 )}
 
-                                {/* Add Another Floor Button */}
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -465,7 +434,6 @@ export function Projects() {
                             ))
                           )}
 
-                          {/* Add Floor Button (when floors exist) */}
                           {block.floors.length > 0 && (
                             <Button
                               variant="outline"
@@ -483,7 +451,7 @@ export function Projects() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  ))
                 )}
               </CardContent>
             )}
@@ -491,7 +459,6 @@ export function Projects() {
         ))}
       </div>
 
-      {/* Create Project Dialog */}
       <Dialog open={showCreateProjectDialog} onOpenChange={setShowCreateProjectDialog}>
         <DialogContent>
           <DialogHeader>
@@ -504,9 +471,7 @@ export function Projects() {
               <Input
                 placeholder="e.g., PRJ-2024-001"
                 value={projectFormData.projectCode}
-                onChange={(e) =>
-                  setProjectFormData({ ...projectFormData, projectCode: e.target.value })
-                }
+                onChange={(e) => setProjectFormData({ ...projectFormData, projectCode: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -514,9 +479,7 @@ export function Projects() {
               <Input
                 placeholder="Enter project name"
                 value={projectFormData.name}
-                onChange={(e) =>
-                  setProjectFormData({ ...projectFormData, name: e.target.value })
-                }
+                onChange={(e) => setProjectFormData({ ...projectFormData, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -524,9 +487,7 @@ export function Projects() {
               <Textarea
                 placeholder="Enter project description"
                 value={projectFormData.description}
-                onChange={(e) =>
-                  setProjectFormData({ ...projectFormData, description: e.target.value })
-                }
+                onChange={(e) => setProjectFormData({ ...projectFormData, description: e.target.value })}
                 rows={3}
               />
             </div>
@@ -540,12 +501,11 @@ export function Projects() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Block Dialog */}
       <Dialog open={showAddBlockDialog} onOpenChange={setShowAddBlockDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Block</DialogTitle>
-            <DialogDescription>Add a new block to the project</DialogDescription>
+            <DialogDescription>Add a new block to project</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -566,7 +526,6 @@ export function Projects() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Floor Dialog */}
       <Dialog open={showAddFloorDialog} onOpenChange={setShowAddFloorDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -580,12 +539,7 @@ export function Projects() {
                 type="number"
                 min="1"
                 value={floorFormData.floorNumber}
-                onChange={(e) =>
-                  setFloorFormData({
-                    ...floorFormData,
-                    floorNumber: parseInt(e.target.value) || 1,
-                  })
-                }
+                onChange={(e) => setFloorFormData({ ...floorFormData, floorNumber: parseInt(e.target.value) || 1 })}
               />
             </div>
             <div className="space-y-2">
@@ -593,9 +547,7 @@ export function Projects() {
               <Input
                 placeholder="e.g., Ground Floor, First Floor"
                 value={floorFormData.floorName}
-                onChange={(e) =>
-                  setFloorFormData({ ...floorFormData, floorName: e.target.value })
-                }
+                onChange={(e) => setFloorFormData({ ...floorFormData, floorName: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -603,9 +555,7 @@ export function Projects() {
               <Textarea
                 placeholder="Add notes about this floor"
                 value={floorFormData.notes}
-                onChange={(e) =>
-                  setFloorFormData({ ...floorFormData, notes: e.target.value })
-                }
+                onChange={(e) => setFloorFormData({ ...floorFormData, notes: e.target.value })}
                 rows={3}
               />
             </div>
@@ -614,9 +564,7 @@ export function Projects() {
               <Input
                 type="datetime-local"
                 value={floorFormData.concreteDate}
-                onChange={(e) =>
-                  setFloorFormData({ ...floorFormData, concreteDate: e.target.value })
-                }
+                onChange={(e) => setFloorFormData({ ...floorFormData, concreteDate: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -624,13 +572,10 @@ export function Projects() {
               <Input
                 placeholder="e.g., Approved, Pending, Rejected"
                 value={floorFormData.concreteReview}
-                onChange={(e) =>
-                  setFloorFormData({ ...floorFormData, concreteReview: e.target.value })
-                }
+                onChange={(e) => setFloorFormData({ ...floorFormData, concreteReview: e.target.value })}
               />
             </div>
 
-            {/* Progress Sliders */}
             <div className="space-y-4 pt-4 border-t border-border">
               <h4 className="font-medium text-foreground mb-3">Progress Tracking</h4>
 
@@ -646,12 +591,7 @@ export function Projects() {
                     min="0"
                     max="100"
                     value={floorFormData.groOeuvreProgress}
-                    onChange={(e) =>
-                      setFloorFormData({
-                        ...floorFormData,
-                        groOeuvreProgress: parseInt(e.target.value),
-                      })
-                    }
+                    onChange={(e) => setFloorFormData({ ...floorFormData, groOeuvreProgress: parseInt(e.target.value) })}
                   />
                 </div>
 
@@ -666,12 +606,7 @@ export function Projects() {
                     min="0"
                     max="100"
                     value={floorFormData.cetProgress}
-                    onChange={(e) =>
-                      setFloorFormData({
-                        ...floorFormData,
-                        cetProgress: parseInt(e.target.value),
-                      })
-                    }
+                    onChange={(e) => setFloorFormData({ ...floorFormData, cetProgress: parseInt(e.target.value) })}
                   />
                 </div>
 
@@ -686,12 +621,7 @@ export function Projects() {
                     min="0"
                     max="100"
                     value={floorFormData.cesProgress}
-                    onChange={(e) =>
-                      setFloorFormData({
-                        ...floorFormData,
-                        cesProgress: parseInt(e.target.value),
-                      })
-                    }
+                    onChange={(e) => setFloorFormData({ ...floorFormData, cesProgress: parseInt(e.target.value) })}
                   />
                 </div>
               </div>
