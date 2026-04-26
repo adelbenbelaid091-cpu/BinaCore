@@ -1,57 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
+import type { ReportInsert, ReportUpdate } from '@/types/supabase'
 
+// GET /api/reports - Get all reports
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const projectId = searchParams.get('projectId')
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get('project_id')
 
-    const where = projectId ? { projectId } : {}
+    let query = supabase
+      .from('reports')
+      .select('*, projects (id, name, password)')
 
-    const reports = await db.report.findMany({
-      where,
-      include: {
-        project: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    if (projectId) {
+      query = query.eq('project_id', projectId)
+    }
+
+    const { data: reports, error } = await query.order('created_at', { ascending: false })
+
+    if (error) throw error
 
     return NextResponse.json(reports)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching reports:', error)
-    return NextResponse.json({ error: 'Failed to fetch reports' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch reports' },
+      { status: 500 }
+    )
   }
 }
 
+// POST /api/reports - Create a new report
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { projectId, type, title, description } = body
+    const reportData: ReportInsert = body
 
-    if (!projectId || !type || !title) {
-      return NextResponse.json(
-        { error: 'Project ID, type, and title are required' },
-        { status: 400 }
-      )
-    }
+    const { data: report, error } = await supabase
+      .from('reports')
+      .insert(reportData)
+      .select('*, projects (id, name, password)')
+      .single()
 
-    const report = await db.report.create({
-      data: {
-        projectId,
-        type,
-        title,
-        description,
-      },
-      include: {
-        project: true,
-      },
-    })
+    if (error) throw error
 
     return NextResponse.json(report, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating report:', error)
-    return NextResponse.json({ error: 'Failed to create report' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to create report' },
+      { status: 500 }
+    )
   }
 }

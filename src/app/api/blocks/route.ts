@@ -1,55 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
+import type { BlockInsert, BlockUpdate } from '@/types/supabase'
 
+// GET /api/blocks - Get all blocks
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const projectId = searchParams.get('projectId')
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get('project_id')
 
-    const where = projectId ? { projectId } : {}
+    let query = supabase.from('blocks').select('*, floors(*)')
 
-    const blocks = await db.block.findMany({
-      where,
-      include: {
-        floors: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    if (projectId) {
+      query = query.eq('project_id', projectId)
+    }
+
+    const { data: blocks, error } = await query.order('created_at', { ascending: false })
+
+    if (error) throw error
 
     return NextResponse.json(blocks)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching blocks:', error)
-    return NextResponse.json({ error: 'Failed to fetch blocks' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch blocks' },
+      { status: 500 }
+    )
   }
 }
 
+// POST /api/blocks - Create a new block
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { projectId, name } = body
+    const blockData: BlockInsert = body
 
-    if (!projectId || !name) {
-      return NextResponse.json(
-        { error: 'Project ID and name are required' },
-        { status: 400 }
-      )
-    }
+    const { data: block, error } = await supabase
+      .from('blocks')
+      .insert(blockData)
+      .select()
+      .single()
 
-    const block = await db.block.create({
-      data: {
-        projectId,
-        name,
-      },
-      include: {
-        floors: true,
-      },
-    })
+    if (error) throw error
 
     return NextResponse.json(block, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating block:', error)
-    return NextResponse.json({ error: 'Failed to create block' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to create block' },
+      { status: 500 }
+    )
   }
 }

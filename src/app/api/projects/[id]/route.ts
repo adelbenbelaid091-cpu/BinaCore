@@ -1,74 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
+import type { ProjectUpdate } from '@/types/supabase'
 
+// GET /api/projects/[id] - Get a single project with blocks and floors
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const project = await db.project.findUnique({
-      where: { id: params.id },
-      include: {
-        floors: {
-          include: {
-            activities: true,
-          },
-        },
-        reports: true,
-        tasks: true,
-      },
-    })
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select(`
+        *,
+        blocks (
+          *,
+          floors (*)
+        )
+      `)
+      .eq('id', params.id)
+      .single()
+
+    if (error) throw error
 
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json(project)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching project:', error)
-    return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch project' },
+      { status: 500 }
+    )
   }
 }
 
-export async function PUT(
+// PATCH /api/projects/[id] - Update a project
+export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const body = await request.json()
-    const { name, description, floorsCount } = body
+    const updateData: ProjectUpdate = body
 
-    const project = await db.project.update({
-      where: { id: params.id },
-      data: {
-        name,
-        description,
-        floorsCount,
-      },
-      include: {
-        floors: true,
-      },
-    })
+    const { data: project, error } = await supabase
+      .from('projects')
+      .update(updateData)
+      .eq('id', params.id)
+      .select()
+      .single()
+
+    if (error) throw error
 
     return NextResponse.json(project)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating project:', error)
-    return NextResponse.json({ error: 'Failed to update project' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to update project' },
+      { status: 500 }
+    )
   }
 }
 
+// DELETE /api/projects/[id] - Delete a project
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    await db.project.delete({
-      where: { id: params.id },
-    })
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', params.id)
+
+    if (error) throw error
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting project:', error)
-    return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete project' },
+      { status: 500 }
+    )
   }
 }

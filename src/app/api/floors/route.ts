@@ -1,72 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
+import type { FloorInsert, FloorUpdate } from '@/types/supabase'
 
+// GET /api/floors - Get all floors
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const blockId = searchParams.get('blockId')
+    const { searchParams } = new URL(request.url)
+    const blockId = searchParams.get('block_id')
 
-    const where = blockId ? { blockId } : {}
+    let query = supabase.from('floors').select('*')
 
-    const floors = await db.floor.findMany({
-      where,
-      include: {
-        block: true,
-      },
-      orderBy: {
-        floorNumber: 'asc',
-      },
-    })
+    if (blockId) {
+      query = query.eq('block_id', blockId)
+    }
+
+    const { data: floors, error } = await query.order('floor_number', { ascending: true })
+
+    if (error) throw error
 
     return NextResponse.json(floors)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching floors:', error)
-    return NextResponse.json({ error: 'Failed to fetch floors' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch floors' },
+      { status: 500 }
+    )
   }
 }
 
+// POST /api/floors - Create a new floor
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const {
-      blockId,
-      floorNumber,
-      floorName,
-      notes,
-      concreteDate,
-      concreteReview,
-      groOeuvreProgress,
-      cetProgress,
-      cesProgress,
-    } = body
+    const floorData: FloorInsert = body
 
-    if (!blockId || !floorNumber) {
-      return NextResponse.json(
-        { error: 'Block ID and floor number are required' },
-        { status: 400 }
-      )
-    }
+    const { data: floor, error } = await supabase
+      .from('floors')
+      .insert(floorData)
+      .select()
+      .single()
 
-    const floor = await db.floor.create({
-      data: {
-        blockId,
-        floorNumber,
-        floorName: floorName || null,
-        notes: notes || null,
-        concreteDate: concreteDate ? new Date(concreteDate) : null,
-        concreteReview: concreteReview || null,
-        groOeuvreProgress: groOeuvreProgress || 0,
-        cetProgress: cetProgress || 0,
-        cesProgress: cesProgress || 0,
-      },
-      include: {
-        block: true,
-      },
-    })
+    if (error) throw error
 
     return NextResponse.json(floor, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating floor:', error)
-    return NextResponse.json({ error: 'Failed to create floor' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to create floor' },
+      { status: 500 }
+    )
   }
 }

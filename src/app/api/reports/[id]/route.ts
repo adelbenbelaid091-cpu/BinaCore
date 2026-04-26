@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import type { IssueUpdate } from '@/types/supabase'
+import type { ReportUpdate } from '@/types/supabase'
 
-// PATCH /api/issues/[id] - Update an issue
+// PATCH /api/reports/[id] - Update a report
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const body = await request.json()
-    const updateData: IssueUpdate = body
+    const updateData: ReportUpdate = body
 
-    const { data: issue, error } = await supabase
-      .from('issues')
+    const { data: report, error } = await supabase
+      .from('reports')
       .update(updateData)
       .eq('id', params.id)
       .select()
@@ -20,24 +20,24 @@ export async function PATCH(
 
     if (error) throw error
 
-    return NextResponse.json(issue)
+    return NextResponse.json(report)
   } catch (error: any) {
-    console.error('Error updating issue:', error)
+    console.error('Error updating report:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to update issue' },
+      { error: error.message || 'Failed to update report' },
       { status: 500 }
     )
   }
 }
 
-// DELETE /api/issues/[id] - Delete an issue
+// DELETE /api/reports/[id] - Delete a report
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { id: string } }
 ) {
   try {
     const { error } = await supabase
-      .from('issues')
+      .from('reports')
       .delete()
       .eq('id', params.id)
 
@@ -45,9 +45,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error('Error deleting issue:', error)
+    console.error('Error deleting report:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete issue' },
+      { error: error.message || 'Failed to delete report' },
       { status: 500 }
     )
   }

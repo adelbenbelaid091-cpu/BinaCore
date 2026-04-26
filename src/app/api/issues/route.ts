@@ -1,64 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
+import type { IssueInsert, IssueUpdate } from '@/types/supabase'
 
+// GET /api/issues - Get all issues
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const projectId = searchParams.get('projectId')
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get('project_id')
     const status = searchParams.get('status')
     const severity = searchParams.get('severity')
 
-    const where: any = {}
-    if (projectId) where.projectId = projectId
-    if (status) where.status = status
-    if (severity) where.severity = severity
+    let query = supabase
+      .from('issues')
+      .select('*, projects (id, name, password)')
 
-    const issues = await db.issue.findMany({
-      where,
-      include: {
-        project: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    if (projectId) {
+      query = query.eq('project_id', projectId)
+    }
+
+    if (status && status !== 'all') {
+      query = query.eq('status', status)
+    }
+
+    if (severity && severity !== 'all') {
+      query = query.eq('severity', severity)
+    }
+
+    const { data: issues, error } = await query.order('created_at', { ascending: false })
+
+    if (error) throw error
 
     return NextResponse.json(issues)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching issues:', error)
-    return NextResponse.json({ error: 'Failed to fetch issues' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch issues' },
+      { status: 500 }
+    )
   }
 }
 
+// POST /api/issues - Create a new issue
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { projectId, title, description, type, severity, floor } = body
+    const issueData: IssueInsert = body
 
-    if (!projectId || !title) {
-      return NextResponse.json(
-        { error: 'Project ID and title are required' },
-        { status: 400 }
-      )
-    }
+    const { data: issue, error } = await supabase
+      .from('issues')
+      .insert(issueData)
+      .select('*, projects (id, name, password)')
+      .single()
 
-    const issue = await db.issue.create({
-      data: {
-        projectId,
-        title,
-        description,
-        type: type || 'other',
-        severity: severity || 'medium',
-        floor,
-      },
-      include: {
-        project: true,
-      },
-    })
+    if (error) throw error
 
     return NextResponse.json(issue, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating issue:', error)
-    return NextResponse.json({ error: 'Failed to create issue' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to create issue' },
+      { status: 500 }
+    )
   }
 }

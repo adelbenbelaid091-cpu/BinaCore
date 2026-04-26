@@ -1,58 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
+import type { ProjectInsert, ProjectUpdate } from '@/types/supabase'
 
+// GET /api/projects - Get all projects with blocks and floors
 export async function GET() {
   try {
-    const projects = await db.project.findMany({
-      include: {
-        floors: {
-          include: {
-            activities: true,
-          },
-        },
-        reports: true,
-        tasks: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    const { data: projects, error } = await supabase
+      .from('projects')
+      .select(`
+        *,
+        blocks (
+          *,
+          floors (*)
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
 
     return NextResponse.json(projects)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching projects:', error)
-    return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch projects' },
+      { status: 500 }
+    )
   }
 }
 
+// POST /api/projects - Create a new project
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, description, floorsCount } = body
+    const projectData: ProjectInsert = body
 
-    if (!name) {
-      return NextResponse.json({ error: 'Project name is required' }, { status: 400 })
-    }
+    const { data: project, error } = await supabase
+      .from('projects')
+      .insert(projectData)
+      .select()
+      .single()
 
-    const project = await db.project.create({
-      data: {
-        name,
-        description,
-        floorsCount: floorsCount || 0,
-        floors: {
-          create: Array.from({ length: floorsCount || 0 }, (_, i) => ({
-            floorNumber: i + 1,
-          })),
-        },
-      },
-      include: {
-        floors: true,
-      },
-    })
+    if (error) throw error
 
     return NextResponse.json(project, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating project:', error)
-    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to create project' },
+      { status: 500 }
+    )
   }
 }
