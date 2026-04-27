@@ -13,10 +13,9 @@ const ProjectAuthContext = createContext<ProjectAuth | undefined>(undefined)
 
 export function ProjectAuthProvider({ children }: { children: ReactNode }) {
   const [unlockedProjects, setUnlockedProjects] = useState<Set<string>>(new Set())
-  const [mounted, setMounted] = useState(false)
-
   // Load unlocked projects from session storage on mount
   useEffect(() => {
+    if (typeof window === 'undefined') return
     const saved = sessionStorage.getItem('binacore-unlockedProjects')
     if (saved) {
       try {
@@ -26,15 +25,14 @@ export function ProjectAuthProvider({ children }: { children: ReactNode }) {
         console.error('Failed to load unlocked projects:', error)
       }
     }
-    setMounted(true)
   }, [])
 
   // Save unlocked projects to session storage
   useEffect(() => {
-    if (mounted && unlockedProjects.size > 0) {
+    if (typeof window !== 'undefined' && unlockedProjects.size > 0) {
       sessionStorage.setItem('binacore-unlockedProjects', JSON.stringify(Array.from(unlockedProjects)))
     }
-  }, [unlockedProjects, mounted])
+  }, [unlockedProjects])
 
   const isProjectUnlocked = (projectId: string, projectPassword?: string): boolean => {
     if (!projectPassword) return true
@@ -68,7 +66,7 @@ export function ProjectAuthProvider({ children }: { children: ReactNode }) {
         lockProject,
       }}
     >
-      {mounted ? children : null}
+      {children}
     </ProjectAuthContext.Provider>
   )
 }
